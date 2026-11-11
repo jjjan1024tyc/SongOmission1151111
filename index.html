@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>歌詞省字王 - 模組化互動教具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #050505;
+            color: #fff;
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #1a1a1a; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #777; }
+
+        .tab-header {
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.125rem;
+            padding: 0.75rem 0;
+            margin-bottom: 0.5rem;
+            position: relative;
+        }
+
+        .hide-scrollbar {
+            scrollbar-width: thin;
+            scrollbar-color: #555 #1a1a1a;
+        }
+
+        /* 歌詞文字選取時的顏色 */
+        ::selection {
+            background-color: #ed7d31;
+            color: white;
+        }
+
+        /* 歌詞顯示區保留換行格式 */
+        .source-text-display {
+            white-space: pre-wrap;
+            word-break: break-word;
+            user-select: text;
+        }
+
+        .ch { cursor: text; }
+
+        /* 還沒有被任何模組涵蓋的字：灰色 + 虛線底線 */
+        .ch.uncov {
+            color: #9ca3af;
+            text-decoration: underline dashed #6b7280;
+            text-underline-offset: 6px;
+        }
+
+        /* 已定義模組在歌詞中的標示 (跨行也能正確顯示外框) */
+        .mod-mark {
+            position: relative;
+            background: rgba(234, 88, 12, 0.25);
+            color: #fed7aa;
+            border: 1px solid rgba(234, 88, 12, 0.55);
+            border-radius: 4px;
+            padding: 0 2px;
+            margin: 0 1px;
+            -webkit-box-decoration-break: clone;
+            box-decoration-break: clone;
+        }
+        .mod-badge {
+            position: absolute;
+            top: -0.75rem;
+            left: -0.5rem;
+            width: 1.15rem;
+            height: 1.15rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 9999px;
+            background: #dc2626;
+            border: 1px solid #991b1b;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 900;
+            line-height: 1;
+            user-select: none;
+            pointer-events: none;
+            z-index: 1;
+        }
+        .uncov-sample {
+            color: #9ca3af;
+            text-decoration: underline dashed #6b7280;
+            text-underline-offset: 4px;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden">
+    <!-- 提示訊息框 (Toast) -->
+    <div id="toastMessage" class="fixed top-5 left-1/2 -translate-x-1/2 transform bg-red-600 text-white font-bold px-6 py-3 rounded shadow-2xl z-50 transition-opacity duration-300 opacity-0 pointer-events-none max-w-[90vw] text-center"></div>
+
+    <!-- 確認視窗 -->
+    <div id="confirmModal" class="fixed inset-0 bg-black/70 z-50 hidden items-center justify-center p-4">
+        <div class="bg-[#1a1a1a] border border-gray-700 rounded-xl p-5 max-w-sm w-full shadow-2xl">
+            <div id="confirmText" class="text-white text-lg mb-5 whitespace-pre-wrap leading-relaxed"></div>
+            <div class="flex justify-end gap-3">
+                <button onclick="hideConfirm()" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-5 rounded">取消</button>
+                <button id="confirmOk" class="bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-5 rounded">刪除</button>
+            </div>
+        </div>
+    </div>
+
+    <header class="bg-[#111] p-3 border-b border-gray-800 flex items-center justify-between z-10 shrink-0 shadow-md gap-3">
+        <div class="flex items-center gap-4">
+            <h1 class="text-2xl font-black tracking-wider text-white">
+                歌詞省字王 <span class="text-gray-500 text-lg font-normal ml-2">模組化概念</span>
+            </h1>
+        </div>
+        <div class="flex items-center gap-4">
+            <button id="undoBtn" onclick="undo()" title="復原上一步 (Ctrl+Z)" class="bg-gray-800 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-gray-800 text-white text-sm font-bold py-1.5 px-4 rounded border border-gray-600 transition-colors">↶ 復原</button>
+            <div class="text-xs text-gray-500 hidden sm:block">桃園市建國國中詹智傑老師製作(2026)</div>
+        </div>
+    </header>
+
+    <!-- 五首歌的闖關成績 (點擊可切換歌曲) -->
+    <nav id="scoreboard" class="bg-[#0d0d0d] border-b border-gray-800 px-3 py-2 flex flex-wrap items-center gap-2 shrink-0"></nav>
+
+    <main class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+
+        <section class="w-full md:w-1/3 flex flex-col border-r border-gray-800 h-full bg-[#0a0a0a]">
+            <div class="tab-header bg-[#ed7d31] shadow-lg shadow-orange-900/50 text-white z-10 relative">
+                1. 原始歌詞
+                <div class="absolute right-[-1rem] top-0 w-0 h-0 border-t-[1.35rem] border-t-transparent border-l-[1rem] border-l-[#ed7d31] border-b-[1.35rem] border-b-transparent z-20 hidden md:block"></div>
+            </div>
+
+            <div class="px-4 pt-2 pb-0 flex flex-col gap-2 shrink-0">
+                <select id="songSelector" onchange="changeSong()" class="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white focus:outline-none focus:border-orange-500 transition-colors shadow-inner">
+                    <option value="star">1. 小星星</option>
+                    <option value="congrats">2. 恭喜恭喜</option>
+                    <option value="bird">3. 飛鳥和蟬</option>
+                    <option value="content">4. 知足</option>
+                    <option value="balloon">5. 告白氣球</option>
+                </select>
+                <div class="text-xs text-gray-500">
+                    <span class="uncov-sample">虛線字</span>＝還沒有被任何模組包含的歌詞
+                </div>
+            </div>
+
+            <div class="p-4 pt-3 flex-1 flex flex-col relative overflow-hidden min-h-0">
+                <!-- 每個字元都是一個 span，方便點選與標示 -->
+                <div id="sourceTextDisplay" class="source-text-display w-full flex-1 bg-[#111827] border border-gray-700 rounded p-4 text-lg leading-loose text-gray-200 overflow-y-auto hide-scrollbar shadow-inner"></div>
+            </div>
+
+            <div class="p-3 border-t border-gray-800 flex justify-around bg-black shrink-0 text-sm">
+                <div class="text-center">
+                    <div class="text-gray-500 mb-1">原始歌詞字數</div>
+                    <div><span id="originalCharCount" class="text-2xl font-bold text-white">0</span> 字</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-gray-500 mb-1">模組涵蓋率</div>
+                    <div><span id="coveragePercent" class="text-2xl font-bold text-orange-400">0</span> %</div>
+                    <div id="coverageNote" class="text-xs text-gray-500"></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="w-full md:w-1/3 flex flex-col border-r border-gray-800 h-full bg-[#111]">
+            <div class="tab-header bg-[#c07062] shadow-lg shadow-red-900/50 text-white relative z-10">
+                <div class="absolute left-[-1rem] top-0 w-0 h-0 border-t-[1.35rem] border-t-transparent border-l-[1rem] border-l-[#0a0a0a] border-b-[1.35rem] border-b-transparent z-20 hidden md:block"></div>
+                2. 定義模組
+                <div class="absolute right-[-1rem] top-0 w-0 h-0 border-t-[1.35rem] border-t-transparent border-l-[1rem] border-l-[#c07062] border-b-[1.35rem] border-b-transparent z-20 hidden md:block"></div>
+            </div>
+
+            <div class="px-4 pt-2 pb-4 flex-1 flex flex-col relative overflow-hidden min-h-0 gap-3">
+                <!-- 操作提示 -->
+                <div class="bg-[#1a1a1a] p-3 rounded border border-gray-800 shrink-0 shadow-inner text-sm text-gray-400 font-medium leading-relaxed">
+                    💡 在左側歌詞<b class="text-gray-200">拖曳反白</b>，放開滑鼠就會定義成模組
+                </div>
+
+                <div class="text-xs text-center text-gray-500">點擊模組加入序列・按 ✕ 刪除模組</div>
+
+                <div id="moduleListVertical" class="flex-1 overflow-y-auto hide-scrollbar flex flex-col gap-2 relative z-10 py-1 pr-1"></div>
+            </div>
+
+            <div class="p-3 border-t border-gray-800 flex justify-center bg-[#0a0a0a] shrink-0 text-sm">
+                <div class="text-center">
+                    <div class="text-gray-500 mb-1">已定義模組字數</div>
+                    <div><span id="defTotalCount" class="text-2xl font-bold text-[#c07062]">0</span> 字</div>
+                    <div id="defBreakdown" class="text-xs text-gray-500">代號 0 + 內容 0</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="w-full md:w-1/3 flex flex-col h-full bg-gradient-to-b from-gray-950 to-black relative">
+            <div class="tab-header bg-[#a6a6a6] shadow-lg shadow-gray-900/50 text-black relative z-10">
+                <div class="absolute left-[-1rem] top-0 w-0 h-0 border-t-[1.35rem] border-t-transparent border-l-[1rem] border-l-[#111] border-b-[1.35rem] border-b-transparent z-20 hidden md:block"></div>
+                3. 呼叫模組、重組歌詞
+            </div>
+
+            <div class="px-4 pt-2 pb-4 flex-1 flex flex-col relative overflow-hidden min-h-0 gap-3">
+
+                <!-- 序列顯示區 -->
+                <div class="bg-[#1a1a1a] border border-gray-700 rounded-lg p-2 flex flex-col shrink-0 min-h-[4rem] shadow-inner">
+                    <div class="flex justify-between items-center mb-1 border-b border-gray-800 pb-1 gap-2">
+                        <span class="text-gray-300 text-sm font-bold flex items-center gap-2">
+                            呼叫模組
+                            <span class="bg-gray-700 text-xs px-2 py-0.5 rounded-full" id="sequenceLengthCount">0 步</span>
+                        </span>
+                        <div class="flex gap-3">
+                            <button onclick="backspaceSeq()" title="刪除最後一步（有選取方塊時，刪除選取的那一步）" class="text-gray-400 hover:text-yellow-300 text-xs transition-colors">⌫ 退一步</button>
+                            <button onclick="clearSequence()" class="text-gray-400 hover:text-red-400 text-xs transition-colors">🗑️ 清除</button>
+                        </div>
+                    </div>
+                    <div id="sequenceDisplay" class="flex flex-wrap gap-1 text-xl font-bold text-yellow-400 content-start flex-1 min-h-[1.5rem] max-h-40 overflow-y-auto hide-scrollbar p-1"></div>
+                    <div id="seqToolbar" class="text-xs text-gray-500 mt-1 pt-1 border-t border-gray-800 flex flex-wrap items-center gap-2 min-h-[1.75rem]"></div>
+                </div>
+
+                <!-- 預覽結果區 -->
+                <div class="flex-1 bg-[#111827] border border-gray-700 rounded-lg p-3 overflow-y-auto hide-scrollbar shadow-inner relative group min-h-[6rem]">
+                    <div class="absolute top-2 right-2 text-xs text-gray-600 font-bold bg-black/50 px-2 py-1 rounded">重組歌詞結果</div>
+                    <div id="previewArea" class="text-white text-lg leading-loose whitespace-pre-wrap mt-6">組合結果將顯示於此...</div>
+                </div>
+
+                <div class="shrink-0 flex flex-col gap-2">
+                    <!-- 還原進度 -->
+                    <div class="flex items-center gap-3 text-sm">
+                        <span class="text-gray-400 shrink-0">還原進度</span>
+                        <div class="flex-1 h-2.5 bg-gray-800 rounded-full overflow-hidden">
+                            <div id="restoreBar" class="h-full bg-sky-500 transition-all duration-300" style="width:0%"></div>
+                        </div>
+                        <span id="restorePercent" class="text-white font-bold w-12 text-right">0%</span>
+                    </div>
+
+                    <div class="flex items-center justify-between bg-[#1a1a1a] rounded p-3 border border-gray-800">
+                        <div class="text-gray-400 text-sm">模組化總字數</div>
+                        <div class="flex items-baseline gap-2">
+                            <span id="formulaDisplay" class="text-sm font-bold text-gray-500">0 (定義) + 0 (呼叫) =</span>
+                            <div><span id="modularCharCount" class="text-3xl font-black text-white">0</span> <span class="text-gray-500 text-sm">字</span></div>
+                        </div>
+                    </div>
+
+                    <!-- 計分規則 (常駐) -->
+                    <div class="text-xs text-gray-400 bg-[#1a1a1a] border border-gray-800 rounded px-3 py-2 leading-relaxed">
+                        📏 <b class="text-gray-300">計分規則</b>：定義一個模組＝<b class="text-[#ffb4a6]">代號 1 字</b>＋內容字數；每呼叫一次＝<b class="text-yellow-400">1 字</b>（空白、換行不計）
+                    </div>
+
+                    <!-- 結果狀態大橫幅 -->
+                    <div id="resultStatusDisplay" class="rounded-lg py-3 px-4 text-center font-bold text-lg bg-gray-800 text-gray-400 border border-gray-700 shadow-lg transition-all duration-300">
+                        等待重組中...
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        let modules = [];      // [{id:'A', text:'...'}]
+        let sequence = [];     // ['A','B','A',...]
+        let history = [];      // 復原用的快照
+        let seqCursor = null;  // 序列中目前選取的方塊位置
+        let dragIndex = null;  // 拖曳中的方塊位置
+        let currentSong = null;    // 目前的歌曲代碼
+        let solvedTime = null;     // 目前解法第一次成功的時間
+        const songStates = {};     // 每首歌各自的作答狀態 {modules, sequence, history, solvedTime}
+        const bestScores = {};     // 每首歌的最佳省字紀錄
+        // 每首歌最多可省的字數 (電腦搜尋的最佳切法，經老師確認)，達到即為「完美」
+        const maxSaves = { star: 9, congrats: 119, bird: 221, content: 124, balloon: 136 };
+
+        const songLyrics = {
+            star: `一閃一閃亮晶晶\n滿天都是小星星\n掛在天上放光明\n好像許多小眼睛\n一閃一閃亮晶晶\n滿天都是小星星`,
+            congrats: `每條大街小巷\n每個人的嘴裡\n見面第一句話\n就是恭喜恭喜\n恭喜恭喜恭喜你呀 恭喜恭喜恭喜你\n\n冬天一到盡頭\n真是好的消息\n溫暖的春風\n就要吹醒大地\n恭喜恭喜恭喜你呀 恭喜恭喜恭喜你\n\n皓皓冰雪溶解\n眼看梅花吐蕊\n漫漫長夜過去\n聽到一聲雞啼\n恭喜恭喜恭喜你呀 恭喜恭喜恭喜你\n\n經過多少困難\n經歷多少磨練\n多少心兒盼望\n盼望春的消息\n恭喜恭喜恭喜你呀 恭喜恭喜恭喜你\n\n每條大街小巷\n每個人的嘴裡\n見面第一句話\n就是恭喜恭喜\n恭喜恭喜恭喜你呀 恭喜恭喜恭喜你\n\n冬天一到盡頭\n真是好的消息\n溫暖的春風\n就要吹醒大地\n恭喜恭喜恭喜你呀 恭喜恭喜恭喜你\n恭喜恭喜恭喜你呀 恭喜恭喜恭喜你`,
+            bird: `你說青澀最搭初戀\n如小雪落下海岸線\n第五個季節某一天上演\n我們有相遇的時間\n\n你說空瓶適合許願\n在風暖月光的地點\n第十三月你就如期出現\n海之角也不再遙遠\n\n你驕傲的飛遠 我棲息的夏天\n聽不見的宣言 重複過很多年\n北緯線的思念被季風吹遠\n吹遠默念的側臉 吹遠鳴唱的詩篇\n\n你驕傲的飛遠 我棲息的葉片\n去不同的世界 卻從不曾告別\n滄海月的想念羽化我昨天\n在我成熟的笑臉 你卻未看過一眼\n\n你說空瓶適合許願\n在風暖月光的地點\n第十三月你就如期出現\n海之角也不再遙遠\n\n你驕傲的飛遠 我棲息的夏天\n聽不見的宣言 重複過很多年\n北緯線的思念被季風吹遠\n吹遠默念的側臉 吹遠鳴唱的詩篇\n\n你驕傲的飛遠 我棲息的葉片\n去不同的世界 卻從不曾告別\n滄海月的想念羽化我昨天\n在我成熟的笑臉 你卻未看過一眼\n\n你驕傲的飛遠 我棲息的夏天\n聽不見的宣言 重複過很多年\n北緯線的思念被季風吹遠\n吹遠默念的側臉 吹遠鳴唱的詩篇\n\n你驕傲的飛遠 我棲息的葉片\n去不同的世界 卻從不曾告別\n滄海月的想念羽化我昨天\n在我成熟的笑臉 你卻未看過一眼`,
+            content: `怎麼去擁有 一道彩虹\n怎麼去擁抱 一夏天的風\n天上的星星 笑地上的人\n總是不能懂 不能覺得足夠\n\n如果我愛上 你的笑容\n要怎麼收藏 要怎麼擁有\n如果你快樂 不是為我\n會不會放手 其實才是擁有\n\n當一陣風吹來 風箏飛上天空\n為了你而祈禱 而祝福 而感動\n終於你身影 消失在 人海盡頭\n才發現 笑著哭 最痛\n\n那天你和我 那個山丘\n那樣的唱著 那一年的歌\n那樣的回憶 那麼足夠\n足夠我天天 都品嚐著寂寞\n\n當一陣風吹來 風箏飛上天空\n為了你而祈禱 而祝福 而感動\n終於你身影 消失在 人海盡頭\n才發現 笑著哭 最痛\n\n當一陣風吹來 風箏飛上天空\n為了你而祈禱 而祝福 而感動\n終於你身影 消失在 人海盡頭\n才發現 笑著哭 最痛\n\n如果我愛上 你的笑容\n要怎麼收藏 要怎麼擁有\n如果你快樂 不是為我\n會不會放手 其實才是擁有\n\n知足的快樂 叫我忍受心痛\n知足的快樂 叫我忍受心痛`,
+            balloon: `塞納河畔 左岸的咖啡\n我手一杯 品嚐你的美\n留下唇印的嘴\n\n花店玫瑰 名字寫錯誰\n告白氣球 風吹到對街\n微笑在天上飛\n\n你說你有點難追 想讓我知難而退\n禮物不需挑最貴 只要香榭的落葉\n營造浪漫的約會 不害怕搞砸一切\n擁有你就擁有 全世界\n\n親愛的 愛上你 從那天起\n甜蜜的很輕易\n\n親愛的 別任性 你的眼睛\n在說我願意\n\n塞納河畔 左岸的咖啡\n我手一杯 品嚐你的美\n留下唇印的嘴\n\n花店玫瑰 名字寫錯誰\n告白氣球 風吹到對街\n微笑在天上飛\n\n你說你有點難追 想讓我知難而退\n禮物不需挑最貴 只要香榭的落葉\n營造浪漫的約會 不害怕搞砸一切\n擁有你就擁有 全世界\n\n親愛的 愛上你 從那天起\n甜蜜的很輕易\n\n親愛的 別任性 你的眼睛\n在說我願意\n\n親愛的 愛上你 戀愛日記\n飄香水的回憶\n一整瓶 的夢境 全都有你\n攪拌在一起\n\n親愛的 別任性 你的眼睛\n在說我願意`
+        };
+
+        // ===================== 共用小工具 =====================
+
+        const esc = (str) => str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+        function getRaw() {
+            return songLyrics[document.getElementById('songSelector').value];
+        }
+
+        function countVisibleChars(str) {
+            return str.replace(/\s+/g, '').length; // 忽略所有空白與換行計算純字數
+        }
+
+        // 把多行文字縮短成一行，方便在提示中顯示
+        function shortText(text, max) {
+            const oneLine = text.replace(/\n+/g, ' / ');
+            return oneLine.length > max ? oneLine.slice(0, max) + '…' : oneLine;
+        }
+
+        // ===================== 提示訊息與確認視窗 =====================
+
+        let toastTimer1 = null, toastTimer2 = null;
+        function showMessage(text, type = 'error') {
+            const colors = { error: 'bg-red-600', info: 'bg-sky-600', success: 'bg-emerald-600' };
+            const toast = document.getElementById('toastMessage');
+            toast.className = `fixed top-5 left-1/2 -translate-x-1/2 transform ${colors[type] || colors.error} text-white font-bold px-6 py-3 rounded shadow-2xl z-50 transition-opacity duration-300 opacity-0 pointer-events-none max-w-[90vw] text-center`;
+            toast.innerText = text;
+            clearTimeout(toastTimer1);
+            clearTimeout(toastTimer2);
+            toastTimer1 = setTimeout(() => toast.classList.remove('opacity-0'), 10);
+            toastTimer2 = setTimeout(() => toast.classList.add('opacity-0'), 3000);
+        }
+
+        function askConfirm(text, onOk) {
+            const modal = document.getElementById('confirmModal');
+            document.getElementById('confirmText').innerText = text;
+            document.getElementById('confirmOk').onclick = () => { hideConfirm(); onOk(); };
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function hideConfirm() {
+            const modal = document.getElementById('confirmModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // ===================== 復原 =====================
+
+        function snapshot() {
+            history.push(JSON.stringify({ modules, sequence }));
+            if (history.length > 100) history.shift();
+            updateUndoBtn();
+        }
+
+        function undo() {
+            if (history.length === 0) {
+                showMessage('沒有可以復原的動作', 'info');
+                return;
+            }
+            const s = JSON.parse(history.pop());
+            modules = s.modules;
+            sequence = s.sequence;
+            seqCursor = null;
+            updateAll();
+            showMessage('已復原上一步', 'info');
+        }
+
+        function updateUndoBtn() {
+            document.getElementById('undoBtn').disabled = history.length === 0;
+        }
+
+        // ===================== 初始化 =====================
+
+        window.onload = () => {
+            // 拖曳反白放開時，立即定義模組 (拖曳可能在歌詞區外放開，所以監聽整個頁面)
+            document.addEventListener('mouseup', () => setTimeout(defineFromSelection, 0));
+            document.addEventListener('touchend', () => setTimeout(defineFromSelection, 0));
+            document.addEventListener('keydown', (e) => {
+                if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+                    e.preventDefault();
+                    undo();
+                } else if (e.key === 'Escape') {
+                    hideConfirm();
+                    if (seqCursor !== null) { seqCursor = null; refreshSequence(); }
+                }
+            });
+            changeSong();
+        };
+
+        function changeSong() {
+            // 先把目前這首歌的作答狀態存起來
+            if (currentSong) {
+                songStates[currentSong] = { modules, sequence, history, solvedTime };
+            }
+            // 載入新歌曲之前的作答狀態 (沒有就從頭開始)
+            currentSong = document.getElementById('songSelector').value;
+            const s = songStates[currentSong];
+            modules = s ? s.modules : [];
+            sequence = s ? s.sequence : [];
+            history = s ? s.history : [];
+            solvedTime = s ? s.solvedTime : null;
+            seqCursor = null;
+            updateAll();
+        }
+
+        function updateAll() {
+            renderSourceText();
+            updateModuleListUI();
+            updateSequenceUI();
+            updateStatsAndPreview();
+            updateUndoBtn();
+        }
+
+        function refreshSequence() {
+            updateSequenceUI();
+            updateStatsAndPreview();
+            updateUndoBtn();
+        }
+
+        // ===================== 1. 選取歌詞 → 定義模組 =====================
+
+        // 把反白範圍換算成歌詞中的字元位置 (只算和反白真的有重疊的字)
+        function selectionToRange() {
+            const sel = window.getSelection();
+            if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
+            const box = document.getElementById('sourceTextDisplay');
+            const range = sel.getRangeAt(0);
+            if (!range.intersectsNode(box)) return null;
+
+            let min = null, max = null;
+            box.querySelectorAll('[data-i]').forEach(span => {
+                const r = document.createRange();
+                r.selectNodeContents(span);
+                if (range.compareBoundaryPoints(Range.END_TO_START, r) < 0 &&
+                    range.compareBoundaryPoints(Range.START_TO_END, r) > 0) {
+                    const i = Number(span.dataset.i);
+                    if (min === null) min = i;
+                    max = i;
+                }
+            });
+            return min === null ? null : [min, max];
+        }
+
+        function cleanText(text) {
+            // 移除前後空白，以及每一行開頭的空白
+            return text.trim().split('\n').map(line => line.replace(/^[ \t　]+/, '')).join('\n');
+        }
+
+        // 放開滑鼠時：若有反白歌詞，就直接定義成模組
+        function defineFromSelection() {
+            const r = selectionToRange();
+            if (!r) return;
+            const sel = window.getSelection();
+            const text = cleanText(getRaw().substring(r[0], r[1] + 1));
+            sel.removeAllRanges();
+            if (!text) return; // 只選到空白
+
+            // 檢查是否已存在相同的模組內容
+            const dup = modules.find(m => m.text === text);
+            if (dup) {
+                showMessage(`這段已經是模組 ${dup.id} 了`, 'info');
+                return;
+            }
+
+            // 尋找可用的最小代號 (A-Z)
+            const usedIds = modules.map(m => m.id);
+            let nextId = null;
+            for (let i = 65; i <= 90; i++) {
+                const c = String.fromCharCode(i);
+                if (!usedIds.includes(c)) { nextId = c; break; }
+            }
+            if (!nextId) {
+                showMessage('最多26個模組');
+                return;
+            }
+
+            snapshot();
+            modules.push({ id: nextId, text });
+            modules.sort((a, b) => a.id.localeCompare(b.id));
+            updateAll();
+            showMessage(`已定義模組 ${nextId}`, 'success');
+        }
+
+        // ===================== 2. 模組清單、刪除 =====================
+
+        function removeModule(id) {
+            const mod = modules.find(m => m.id === id);
+            if (!mod) return;
+            const uses = sequence.filter(s => s === id).length;
+            let msg = `確定要刪除模組 ${id}「${shortText(mod.text, 20)}」嗎？`;
+            if (uses > 0) msg += `\n\n序列中的 ${uses} 個 ${id} 也會一起移除。`;
+            askConfirm(msg, () => {
+                snapshot();
+                modules = modules.filter(m => m.id !== id);
+                sequence = sequence.filter(s => s !== id);
+                seqCursor = null;
+                updateAll();
+                showMessage(`已刪除模組 ${id}，按「↶ 復原」可以救回來`, 'info');
+            });
+        }
+
+        function updateModuleListUI() {
+            const list = document.getElementById('moduleListVertical');
+            list.innerHTML = '';
+
+            if (modules.length === 0) {
+                list.innerHTML = '<div class="text-gray-600 text-center text-xs px-2 mt-4 w-full">尚未建立</div>';
+                return;
+            }
+
+            modules.forEach(mod => {
+                const row = document.createElement('div');
+                row.className = 'w-full flex items-stretch bg-[#2a110d] border border-[#c07062] rounded-lg shadow-md shrink-0 overflow-hidden';
+
+                // 主要區域：點擊加入序列
+                const btn = document.createElement('button');
+                btn.className = 'flex-1 min-w-0 flex items-center text-left hover:bg-[#c07062] p-2 transition-colors group';
+                btn.title = `呼叫模組 ${mod.id}`;
+                btn.onclick = () => addToSequence(mod.id);
+
+                const idSpan = document.createElement('span');
+                idSpan.className = 'text-[#ffb4a6] group-hover:text-white font-black text-2xl w-10 shrink-0 text-center transition-colors';
+                idSpan.textContent = mod.id;
+
+                const textWrap = document.createElement('span');
+                textWrap.className = 'border-l border-[#c07062]/50 group-hover:border-white/50 pl-3 ml-1 flex-1 min-w-0 flex flex-col gap-1 transition-colors';
+
+                const textSpan = document.createElement('span');
+                textSpan.className = 'text-white text-sm leading-tight whitespace-pre-wrap';
+                textSpan.textContent = mod.text;
+
+                textWrap.appendChild(textSpan);
+                btn.appendChild(idSpan);
+                btn.appendChild(textWrap);
+
+                // 刪除按鈕
+                const del = document.createElement('button');
+                del.className = 'px-3 text-gray-400 hover:text-white hover:bg-red-700 border-l border-[#c07062]/50 transition-colors text-lg shrink-0';
+                del.textContent = '✕';
+                del.title = `刪除模組 ${mod.id}`;
+                del.onclick = () => removeModule(mod.id);
+
+                row.appendChild(btn);
+                row.appendChild(del);
+                list.appendChild(row);
+            });
+        }
+
+        // ===================== 3. 呼叫序列 =====================
+
+        function addToSequence(id) {
+            snapshot();
+            if (seqCursor !== null) {
+                // 有選取方塊時，插入在它後面
+                sequence.splice(seqCursor + 1, 0, id);
+                seqCursor = seqCursor + 1;
+            } else {
+                sequence.push(id);
+            }
+            refreshSequence();
+        }
+
+        function backspaceSeq() {
+            if (sequence.length === 0) {
+                showMessage('序列是空的', 'info');
+                return;
+            }
+            snapshot();
+            if (seqCursor !== null) {
+                sequence.splice(seqCursor, 1);
+                seqCursor = seqCursor > 0 ? seqCursor - 1 : null;
+                if (sequence.length === 0) seqCursor = null;
+            } else {
+                sequence.pop();
+            }
+            refreshSequence();
+        }
+
+        function clearSequence() {
+            if (sequence.length === 0) return;
+            snapshot();
+            sequence = [];
+            seqCursor = null;
+            refreshSequence();
+            showMessage('已清除序列，按「↶ 復原」可以救回來', 'info');
+        }
+
+        function moveSeq(from, to) {
+            if (from === null || to === null || from === to) return;
+            if (to < 0 || to >= sequence.length) return;
+            snapshot();
+            const [item] = sequence.splice(from, 1);
+            sequence.splice(to, 0, item);
+            refreshSequence();
+        }
+
+        function seqShift(dir) {
+            if (seqCursor === null) return;
+            const to = seqCursor + dir;
+            if (to < 0 || to >= sequence.length) return;
+            moveSeq(seqCursor, to);
+            seqCursor = to;
+            refreshSequence();
+        }
+
+        function seqDeselect() {
+            seqCursor = null;
+            refreshSequence();
+        }
+
+        function updateSequenceUI() {
+            const display = document.getElementById('sequenceDisplay');
+            const toolbar = document.getElementById('seqToolbar');
+            display.innerHTML = '';
+
+            if (sequence.length === 0) {
+                display.innerHTML = '<span class="text-gray-400 text-sm font-normal items-center flex">點擊中間模組清單的代號來排列順序...</span>';
+                toolbar.innerHTML = '';
+                return;
+            }
+
+            sequence.forEach((id, index) => {
+                const selected = index === seqCursor;
+                const item = document.createElement('span');
+                item.className = selected
+                    ? 'cursor-pointer select-none bg-sky-800 border-2 border-sky-300 text-white rounded-md w-10 h-10 flex items-center justify-center shadow-[0_0_10px_rgba(56,189,248,0.7)] shrink-0 transition-all'
+                    : 'cursor-pointer select-none bg-yellow-900/50 border border-yellow-600 text-yellow-400 rounded-md w-10 h-10 flex items-center justify-center hover:border-sky-400 hover:text-sky-300 transition-all shadow-md shrink-0';
+                item.innerText = id;
+                item.title = `第 ${index + 1} 步：點一下選取，可移動或刪除`;
+                item.draggable = true;
+                item.onclick = () => {
+                    seqCursor = (seqCursor === index) ? null : index;
+                    refreshSequence();
+                };
+                // 電腦滑鼠可直接拖曳排序
+                item.ondragstart = (e) => {
+                    dragIndex = index;
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', String(index));
+                };
+                item.ondragover = (e) => {
+                    e.preventDefault();
+                    item.classList.add('ring-2', 'ring-orange-400');
+                };
+                item.ondragleave = () => item.classList.remove('ring-2', 'ring-orange-400');
+                item.ondrop = (e) => {
+                    e.preventDefault();
+                    seqCursor = null;
+                    moveSeq(dragIndex, index);
+                    dragIndex = null;
+                };
+                display.appendChild(item);
+
+                // 插入點游標：新模組會插在這裡
+                if (selected) {
+                    const caret = document.createElement('span');
+                    caret.className = 'w-1 h-10 bg-sky-400 rounded animate-pulse shrink-0';
+                    caret.title = '新呼叫的模組會插入在這裡';
+                    display.appendChild(caret);
+                }
+            });
+
+            if (seqCursor === null) {
+                toolbar.innerHTML = '<span>💡 點方塊可選取，再移動或刪除；用滑鼠也可以直接拖曳排序</span>';
+            } else {
+                const btnCls = 'bg-gray-700 hover:bg-gray-600 text-white px-2 py-0.5 rounded disabled:opacity-30';
+                toolbar.innerHTML = `
+                    <span class="text-sky-300 font-bold">第 ${seqCursor + 1} 步「${sequence[seqCursor]}」</span>
+                    <button class="${btnCls}" onclick="seqShift(-1)" ${seqCursor === 0 ? 'disabled' : ''}>◀ 左移</button>
+                    <button class="${btnCls}" onclick="seqShift(1)" ${seqCursor === sequence.length - 1 ? 'disabled' : ''}>右移 ▶</button>
+                    <button class="bg-red-800 hover:bg-red-700 text-white px-2 py-0.5 rounded" onclick="backspaceSeq()">✕ 刪除</button>
+                    <button class="${btnCls}" onclick="seqDeselect()">取消選取</button>
+                    <span class="w-full text-gray-500">新呼叫的模組會插入在它後面（藍色游標處）</span>`;
+            }
+        }
+
+        // ===================== 歌詞標示 (模組 + 未涵蓋) =====================
+
+        // 找出每個字屬於哪個模組 (長的模組優先，不重疊)
+        function computeCoverage(raw) {
+            const owner = new Array(raw.length).fill(null);
+            const occs = [];
+            const sorted = [...modules].sort((a, b) => b.text.length - a.text.length);
+            sorted.forEach(mod => {
+                let from = 0;
+                while (true) {
+                    const p = raw.indexOf(mod.text, from);
+                    if (p === -1) break;
+                    const end = p + mod.text.length;
+                    let free = true;
+                    for (let j = p; j < end; j++) {
+                        if (owner[j] !== null) { free = false; break; }
+                    }
+                    if (free) {
+                        for (let j = p; j < end; j++) owner[j] = occs.length;
+                        occs.push({ id: mod.id, start: p, end: end - 1 });
+                        from = end;
+                    } else {
+                        from = p + 1;
+                    }
+                }
+            });
+            return { owner, occs };
+        }
+
+        function renderSourceText() {
+            const raw = getRaw();
+            const { owner, occs } = computeCoverage(raw);
+
+            let html = '';
+            let total = 0, covered = 0;
+            for (let i = 0; i < raw.length; i++) {
+                const o = owner[i];
+                if (o !== null && occs[o].start === i) {
+                    html += `<mark class="mod-mark"><span class="mod-badge">${occs[o].id}</span>`;
+                }
+                const c = raw[i];
+                const isWs = /\s/.test(c);
+                if (!isWs) {
+                    total++;
+                    if (o !== null) covered++;
+                }
+                const cls = 'ch' + (!isWs && o === null ? ' uncov' : '');
+                html += `<span data-i="${i}" class="${cls}">${esc(c)}</span>`;
+                if (o !== null && occs[o].end === i) html += '</mark>';
+            }
+            document.getElementById('sourceTextDisplay').innerHTML = html;
+
+            // 涵蓋率
+            const pct = total ? Math.floor(covered / total * 100) : 0;
+            document.getElementById('coveragePercent').innerText = pct;
+            document.getElementById('coverageNote').innerText = covered === total ? '✅ 全部涵蓋' : `還差 ${total - covered} 字`;
+        }
+
+        // ===================== 統計與預覽 =====================
+
+        function setRestoreProgress(pct) {
+            document.getElementById('restoreBar').style.width = pct + '%';
+            document.getElementById('restorePercent').innerText = pct + '%';
+            document.getElementById('restoreBar').className = 'h-full transition-all duration-300 ' + (pct === 100 ? 'bg-emerald-500' : 'bg-sky-500');
+        }
+
+        function updateStatsAndPreview() {
+            const originalText = getRaw();
+            const originalCount = countVisibleChars(originalText);
+            document.getElementById('originalCharCount').innerText = originalCount;
+
+            const defSymbolCount = modules.length;
+            let defTextCount = 0;
+            modules.forEach(mod => { defTextCount += countVisibleChars(mod.text); });
+            const defTotalCount = defSymbolCount + defTextCount;
+            document.getElementById('defTotalCount').innerText = defTotalCount;
+            document.getElementById('defBreakdown').innerText = `代號 ${defSymbolCount} + 內容 ${defTextCount}`;
+
+            document.getElementById('sequenceLengthCount').innerText = `${sequence.length} 步`;
+
+            const previewArea = document.getElementById('previewArea');
+            const resultStatusDisplay = document.getElementById('resultStatusDisplay');
+            const formulaDisplay = document.getElementById('formulaDisplay');
+            const modularCharCount = document.getElementById('modularCharCount');
+
+            // 如果沒有序列，顯示初始狀態
+            if (sequence.length === 0) {
+                previewArea.innerHTML = '<span class="text-gray-600">組合結果將顯示於此...</span>';
+                formulaDisplay.innerText = `${defTotalCount} (定義) + 0 (呼叫) =`;
+                modularCharCount.innerText = defTotalCount;
+                setRestoreProgress(0);
+                resultStatusDisplay.className = "rounded-lg py-3 px-4 text-center font-bold text-lg bg-gray-800 text-gray-400 border border-gray-700 shadow-lg transition-all duration-300";
+                resultStatusDisplay.innerHTML = `等待重組中...`;
+                solvedTime = null;
+                renderScoreboard();
+                return;
+            }
+
+            // 產生重組預覽文字
+            let previewTextRaw = '';
+            sequence.forEach(id => {
+                const mod = modules.find(m => m.id === id);
+                if (mod) previewTextRaw += mod.text;
+            });
+
+            // 進行智慧排版對齊比對
+            const origClean = originalText.replace(/\s+/g, '');
+            const prevClean = previewTextRaw.replace(/\s+/g, '');
+
+            // 建立無空白原始字串與帶空白原始字串的 index 對應表
+            let origIndexMap = [];
+            for (let i = 0; i < originalText.length; i++) {
+                if (!/\s/.test(originalText[i])) origIndexMap.push(i);
+            }
+
+            // 找出兩者從頭開始完全相符的「純文字」長度
+            let matchLen = 0;
+            while (matchLen < origClean.length && matchLen < prevClean.length && origClean[matchLen] === prevClean[matchLen]) {
+                matchLen++;
+            }
+
+            let correctText = "";
+            let incorrectText = "";
+
+            if (matchLen === 0) {
+                incorrectText = previewTextRaw;
+            } else {
+                let lastOrigIndex = origIndexMap[matchLen - 1];
+                let stopIndex = lastOrigIndex + 1;
+                while (stopIndex < originalText.length && /\s/.test(originalText[stopIndex])) {
+                    stopIndex++;
+                }
+                correctText = originalText.substring(0, stopIndex);
+
+                if (matchLen < prevClean.length) {
+                    let pValid = 0;
+                    let pCutIndex = 0;
+                    for (let i = 0; i < previewTextRaw.length; i++) {
+                        if (!/\s/.test(previewTextRaw[i])) pValid++;
+                        if (pValid > matchLen) { pCutIndex = i; break; }
+                    }
+                    incorrectText = previewTextRaw.substring(pCutIndex);
+                }
+            }
+
+            // 序列中選取了方塊時，算出那一步在重組歌詞中的範圍 (以不含空白的字數計)
+            let hlStart = -1, hlEnd = -1;
+            if (seqCursor !== null && seqCursor < sequence.length) {
+                let pos = 0;
+                for (let k = 0; k < seqCursor; k++) {
+                    const m = modules.find(x => x.id === sequence[k]);
+                    if (m) pos += countVisibleChars(m.text);
+                }
+                const cur = modules.find(x => x.id === sequence[seqCursor]);
+                hlStart = pos;
+                hlEnd = pos + (cur ? countVisibleChars(cur.text) : 0);
+            }
+            const hlId = seqCursor !== null ? sequence[seqCursor] : '';
+            previewArea.innerHTML = buildPreviewHTML(correctText, incorrectText, hlStart, hlEnd, hlId);
+            const stepMark = previewArea.querySelector('.step-mark');
+            if (stepMark) stepMark.scrollIntoView({ block: 'nearest' });
+
+            // 還原進度 (從頭開始正確的比例)
+            setRestoreProgress(Math.floor(matchLen / origClean.length * 100));
+
+            // 計算模組化後總字數
+            const sequenceCount = sequence.length;
+            const modularTotalCount = defTotalCount + sequenceCount;
+            modularCharCount.innerText = modularTotalCount;
+            formulaDisplay.innerText = `${defTotalCount} (定義) + ${sequenceCount} (呼叫) =`;
+
+            let savedCount = originalCount - modularTotalCount;
+
+            if (origClean === prevClean) {
+                // 第一次達成這個解法時記下時間 (切換歌曲再回來仍顯示原本的時間)
+                if (!solvedTime) {
+                    const now = new Date();
+                    const days = ['日', '一', '二', '三', '四', '五', '六'];
+                    solvedTime = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日星期${days[now.getDay()]} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+                }
+
+                // 更新這首歌的最佳紀錄
+                const best = bestScores[currentSong];
+                if (best === undefined || savedCount > best) bestScores[currentSong] = savedCount;
+                const bestNote = bestScores[currentSong] > savedCount
+                    ? `<span class="text-base font-bold text-yellow-900 block">🏆 最佳紀錄：省 ${bestScores[currentSong]} 字</span>`
+                    : '';
+
+                resultStatusDisplay.className = "rounded-lg py-3 px-4 text-center font-black text-xl bg-[#e8c338] text-black border-2 border-yellow-500 shadow-[0_0_15px_rgba(232,195,56,0.5)] transition-all duration-300";
+                resultStatusDisplay.innerHTML = `成功還原歌詞，省下<span class="text-4xl text-red-600 mx-1 drop-shadow-md">${savedCount}</span>字！ <span class="text-base font-normal text-yellow-900 ml-2 block sm:inline">(${solvedTime})</span>${bestNote}`;
+            } else {
+                solvedTime = null;
+                resultStatusDisplay.className = "rounded-lg py-3 px-4 text-center font-bold text-lg bg-red-900 text-white border border-red-700 shadow-lg transition-all duration-300";
+                resultStatusDisplay.innerHTML = matchLen < prevClean.length
+                    ? `❌ 紅色的部分和原歌詞不符，請修正！`
+                    : `⏳ 目前都正確，請繼續呼叫模組！`;
+            }
+            renderScoreboard();
+        }
+
+        // 產生重組預覽：正確部分白色、錯誤部分紅色，
+        // 選取的那一步用和原始歌詞相同的模組標示 (橘框 + 紅色代號圓標)
+        function buildPreviewHTML(correctText, incorrectText, hlStart, hlEnd, hlId) {
+            // 把每個字標上「第幾個非空白字」；空白則看它後面的字
+            const chars = [];
+            let idx = 0;
+            [[correctText, 'text-white'], [incorrectText, 'text-red-500 font-bold']].forEach(([text, color]) => {
+                for (const c of text) {
+                    const ws = /\s/.test(c);
+                    chars.push({ c, color, idx, ws });
+                    if (!ws) idx++;
+                }
+            });
+            // 字在範圍內就框起來；空白只有夾在框內的字之間才框
+            const inside = (ch) => ch.ws ? (ch.idx > hlStart && ch.idx < hlEnd) : (ch.idx >= hlStart && ch.idx < hlEnd);
+
+            let html = '', inMark = false, runColor = null, run = '';
+            const flush = () => {
+                if (run) html += `<span class="${runColor}">${esc(run)}</span>`;
+                run = '';
+            };
+            chars.forEach(ch => {
+                const ins = hlStart >= 0 && inside(ch);
+                if (ins !== inMark) {
+                    flush();
+                    html += ins ? `<span class="mod-mark step-mark"><span class="mod-badge">${esc(hlId)}</span>` : '</span>';
+                    inMark = ins;
+                }
+                // 標示內的正確文字沿用模組標示的顏色，錯誤文字仍為紅色
+                const color = (ins && ch.color === 'text-white') ? '' : ch.color;
+                if (color !== runColor) { flush(); runColor = color; }
+                run += ch.c;
+            });
+            flush();
+            if (inMark) html += '</span>';
+            return html;
+        }
+
+        // ===================== 正上方：五首歌成績列 =====================
+
+        function selectSong(key) {
+            document.getElementById('songSelector').value = key;
+            changeSong();
+        }
+
+        function renderScoreboard() {
+            const bar = document.getElementById('scoreboard');
+            const options = [...document.getElementById('songSelector').options];
+            let total = 0, solvedCount = 0;
+            let html = '<span class="text-gray-400 text-sm font-bold shrink-0 mr-1">🏆 闖關成績</span>';
+
+            options.forEach(opt => {
+                const key = opt.value;
+                const name = opt.text.replace(/^\d+\.\s*/, '');
+                const best = bestScores[key];
+                const isCurrent = key === currentSong;
+                const ring = isCurrent ? ' ring-2 ring-orange-500 ring-offset-1 ring-offset-black' : '';
+                let cls, status;
+                if (best !== undefined) {
+                    total += best;
+                    solvedCount++;
+                    if (best >= maxSaves[key]) {
+                        cls = 'bg-yellow-500 border-yellow-300 text-black hover:bg-yellow-400';
+                        status = `完美省 <b>${best}</b> 字`;
+                    } else {
+                        cls = 'bg-yellow-500/15 border-yellow-500 text-yellow-300 hover:bg-yellow-500/25';
+                        status = `省 <b class="text-white">${best}</b> 字`;
+                    }
+                } else {
+                    const s = key === currentSong ? { modules } : songStates[key];
+                    const started = s && s.modules.length > 0;
+                    cls = 'bg-gray-800/60 border-gray-700 text-gray-400 hover:bg-gray-700';
+                    status = started ? '進行中' : '未挑戰';
+                }
+                html += `<button onclick="selectSong('${key}')" title="切換到「${name}」" class="border rounded-full px-3 py-1 text-sm transition-colors whitespace-nowrap ${cls}${ring}"><span class="font-bold">${name}</span>　${status}</button>`;
+            });
+
+            html += `<span class="ml-auto text-sm text-gray-400 shrink-0">完成 <b class="text-white">${solvedCount}</b>/${options.length} 首・總共省 <b class="text-yellow-300 text-lg">${total}</b> 字</span>`;
+            bar.innerHTML = html;
+        }
+    </script>
+</body>
+</html>
