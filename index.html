@@ -187,7 +187,7 @@
 
         <!-- 第 3 排：歌詞區 (左右等高) -->
         <div class="bg-[#0a0a0a] border-r border-gray-800 px-4 py-3 min-h-0 flex flex-col">
-            <div id="sourceTextDisplay" class="source-text-display w-full flex-1 bg-[#111827] border border-gray-700 rounded p-4 text-lg leading-[1.8] text-gray-200 overflow-y-auto hide-scrollbar shadow-inner"></div>
+            <div id="sourceTextDisplay" class="source-text-display w-full flex-1 bg-[#111827] border border-gray-700 rounded p-4 text-xl leading-[1.8] text-gray-200 overflow-y-auto hide-scrollbar shadow-inner"></div>
         </div>
         <div class="bg-[#111] border-r border-gray-800 px-4 py-3 min-h-0 flex flex-col gap-2">
             <div id="moduleListVertical" class="flex-1 min-h-0 overflow-y-auto hide-scrollbar flex flex-col gap-2 relative z-10 py-1 pr-1"></div>
@@ -195,7 +195,7 @@
         <div class="bg-gray-950 px-4 py-3 min-h-0 flex flex-col">
             <div id="previewScroll" class="flex-1 min-h-0 bg-[#111827] border border-gray-700 rounded p-4 overflow-y-auto hide-scrollbar shadow-inner relative">
                 <div class="absolute top-2 right-2 text-xs text-gray-600 font-bold bg-black/50 px-2 py-1 rounded">重組歌詞結果</div>
-                <div id="previewArea" class="text-white text-lg leading-[1.8] whitespace-pre-wrap">組合結果將顯示於此...</div>
+                <div id="previewArea" class="text-white text-xl leading-[1.8] whitespace-pre-wrap">組合結果將顯示於此...</div>
             </div>
         </div>
 
@@ -527,7 +527,7 @@
                 textWrap.className = 'border-l border-[#c07062]/50 group-hover:border-white/50 pl-3 ml-1 flex-1 min-w-0 flex flex-col gap-1 transition-colors';
 
                 const textSpan = document.createElement('span');
-                textSpan.className = 'text-white text-lg leading-[1.8] whitespace-pre-wrap';
+                textSpan.className = 'text-white text-xl leading-[1.8] whitespace-pre-wrap';
                 textSpan.textContent = mod.text;
 
                 textWrap.appendChild(textSpan);
