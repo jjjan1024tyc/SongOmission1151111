@@ -94,8 +94,8 @@
         }
 
         /* ===== 版面：精簡欄位標題、序列方塊、下方資訊 ===== */
-        .tab-header { padding: 0.4rem 0; margin-bottom: 0; font-size: 1rem; }
-        .tab-arrow-r, .tab-arrow-l { position:absolute; top:0; width:0; height:0; border-top:1.2rem solid transparent; border-bottom:1.2rem solid transparent; border-left:1rem solid; z-index:20; }
+        .tab-header { padding: 0.4rem 0; margin-bottom: 0; font-size: 1.25rem; line-height: 1.75rem; }
+        .tab-arrow-r, .tab-arrow-l { position:absolute; top:0; width:0; height:0; border-top:1.275rem solid transparent; border-bottom:1.275rem solid transparent; border-left:1rem solid; z-index:20; }
         .tab-arrow-r { right:-1rem; }
         .tab-arrow-l { left:0; }
         #resultStatusDisplay { padding: 0.3rem 0.75rem !important; font-size: 0.95rem !important; border-width: 1px !important; text-align: center; border-radius: 0.5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -161,7 +161,7 @@
         </div>
         <div class="tab-header bg-[#a6a6a6] shadow-lg shadow-gray-900/50 text-black z-10 relative">
             <div class="tab-arrow-l" style="border-left-color:#111"></div>
-            3. 呼叫模組、重組歌詞
+            3. 呼叫模組、還原歌詞
         </div>
 
         <!-- 第 2 排：上方工具 -->
@@ -527,7 +527,7 @@
                 textWrap.className = 'border-l border-[#c07062]/50 group-hover:border-white/50 pl-3 ml-1 flex-1 min-w-0 flex flex-col gap-1 transition-colors';
 
                 const textSpan = document.createElement('span');
-                textSpan.className = 'text-white text-sm leading-[1.8] whitespace-pre-wrap';
+                textSpan.className = 'text-white text-lg leading-[1.8] whitespace-pre-wrap';
                 textSpan.textContent = mod.text;
 
                 textWrap.appendChild(textSpan);
@@ -881,7 +881,7 @@
                     syncScores(); // 最佳成績有變，上傳到老師的試算表
                 }
                 // 完成：還原進度換成「成功還原」
-                document.getElementById('successBanner').innerHTML = `成功還原歌詞，省下<span class="text-3xl text-red-600 mx-1 leading-none">${savedCount}</span>字`;
+                document.getElementById('successBanner').innerHTML = `還原成功，省<span class="text-3xl text-red-600 mx-1 leading-none">${savedCount}</span>字`;
                 showSolved('solved');
             } else {
                 solvedTime = null;
