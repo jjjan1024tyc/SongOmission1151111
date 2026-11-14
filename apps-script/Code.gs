@@ -21,7 +21,17 @@ const SONGS = [
 
 const HEADERS = ['學生 Email']
   .concat(SONGS.map(s => s[1]))
-  .concat(['完成首數', '完美首數', '總省字', '最後更新']);
+  .concat(['完成首數', '完美首數', '總省字', '總分', '最後更新']);
+
+// 每首歌的分數：未完成 0 分；還原成功但沒省到字 (≤0) 0 分；省字 15 分；完美 20 分
+function songPoints_(best, maxSave) {
+  if (best === null || best === '' || typeof best !== 'number' || best <= 0) return 0;
+  return best >= maxSave ? 20 : 15;
+}
+
+function totalPoints_(bestList) {
+  return bestList.reduce((sum, v, i) => sum + songPoints_(v, SONGS[i][2]), 0);
+}
 
 // 開啟網頁
 function doGet() {
@@ -71,7 +81,7 @@ function saveScores(scores) {
 
     const row = [email]
       .concat(best.map(v => (v === null ? '' : v)))
-      .concat([done, perfect, total, new Date()]);
+      .concat([done, perfect, total, totalPoints_(best), new Date()]);
     sheet.getRange(rowNum, 1, 1, row.length).setValues([row]);
     return { ok: true };
   } finally {
@@ -88,6 +98,22 @@ function getSheet_() {
     sheet.appendRow(HEADERS);
     sheet.setFrozenRows(1);
     sheet.getRange(1, 1, 1, HEADERS.length).setFontWeight('bold');
+  } else {
+    upgradeSheet_(sheet);
   }
   return sheet;
+}
+
+// 舊版工作表沒有「總分」欄：在「最後更新」前插入一欄，並幫既有學生算好總分
+function upgradeSheet_(sheet) {
+  const totalCol = HEADERS.indexOf('總分') + 1; // 第 10 欄 (J)
+  const header = sheet.getRange(1, totalCol).getValue();
+  if (header === '總分') return;
+  if (header !== '最後更新') return; // 不是預期的舊格式，就不動它
+  sheet.insertColumnBefore(totalCol);
+  sheet.getRange(1, totalCol).setValue('總分').setFontWeight('bold');
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+  const scores = sheet.getRange(2, 2, lastRow - 1, SONGS.length).getValues();
+  sheet.getRange(2, totalCol, lastRow - 1, 1).setValues(scores.map(r => [totalPoints_(r)]));
 }

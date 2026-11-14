@@ -992,10 +992,17 @@
             changeSong();
         }
 
+        // 每首歌的分數：未完成 0 分；還原成功但沒省到字 (≤0) 0 分；省字 15 分；完美 20 分
+        function songPoints(key) {
+            const best = bestScores[key];
+            if (best === undefined || best <= 0) return 0;
+            return best >= maxSaves[key] ? 20 : 15;
+        }
+
         function renderScoreboard() {
             const bar = document.getElementById('scoreboard');
             const options = [...document.getElementById('songSelector').options];
-            let total = 0, solvedCount = 0;
+            let totalPoints = 0, solvedCount = 0;
             let html = '<span class="text-gray-400 text-sm font-bold shrink-0 mr-1">🏆 任務</span>';
 
             options.forEach(opt => {
@@ -1005,15 +1012,19 @@
                 const isCurrent = key === currentSong;
                 const ring = isCurrent ? ' ring-2 ring-orange-500 ring-offset-1 ring-offset-black' : '';
                 let cls, status;
+                let pointsTag = '';
                 if (best !== undefined) {
-                    total += best;
                     solvedCount++;
+                    const pts = songPoints(key);
+                    totalPoints += pts;
                     if (best >= maxSaves[key]) {
                         cls = 'bg-yellow-500 border-yellow-300 text-black hover:bg-yellow-400';
                         status = `完美省 <b>${best}</b> 字`;
+                        pointsTag = `<span class="text-red-600 ml-1">${pts}分</span>`;
                     } else {
                         cls = 'bg-yellow-500/15 border-yellow-500 text-yellow-300 hover:bg-yellow-500/25';
                         status = `省 <b class="text-white">${best}</b> 字`;
+                        pointsTag = `<span class="text-red-500 ml-1">${pts}分</span>`;
                     }
                 } else {
                     const s = key === currentSong ? { modules } : songStates[key];
@@ -1021,8 +1032,10 @@
                     cls = 'bg-gray-800/60 border-gray-700 text-gray-400 hover:bg-gray-700';
                     status = started ? '進行中' : '未挑戰';
                 }
-                html += `<button onclick="selectSong('${key}')" title="切換到「${name}」" class="border rounded-lg px-3 py-0.5 text-sm leading-tight text-center transition-colors whitespace-nowrap ${cls}${ring}"><span class="block font-bold">${name}</span><span class="block text-xs">${status}</span></button>`;
+                html += `<button onclick="selectSong('${key}')" title="切換到「${name}」" class="border rounded-lg px-3 py-0.5 text-sm leading-tight text-center transition-colors whitespace-nowrap ${cls}${ring}"><span class="block font-bold">${name}${pointsTag}</span><span class="block text-xs">${status}</span></button>`;
             });
+
+            html += `<span class="shrink-0 ml-1 text-red-500 font-black text-lg">總分 ${totalPoints} 分</span>`;
 
             html += `<span class="ml-auto text-sm text-gray-400 shrink-0">完成 <b class="text-white">${solvedCount}</b>/${options.length} 首${lastSolvedStamp ? `<span class="text-xs text-gray-500 ml-2">${lastSolvedStamp}</span>` : ''}</span>`;
             bar.innerHTML = html;
