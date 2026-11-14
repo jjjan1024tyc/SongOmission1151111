@@ -455,7 +455,7 @@
                 }
             }
             if (overlapIds.length > 0) {
-                showMessage(`選到的字已經屬於模組 ${overlapIds.join('、')}，請只選還沒有標示的歌詞`);
+                showMessage(`選到的字已經屬於模組 ${overlapIds.join('、')}，請選還沒有標示的歌詞`);
                 return;
             }
 
@@ -1021,7 +1021,7 @@
                     cls = 'bg-gray-800/60 border-gray-700 text-gray-400 hover:bg-gray-700';
                     status = started ? '進行中' : '未挑戰';
                 }
-                html += `<button onclick="selectSong('${key}')" title="切換到「${name}」" class="border rounded-full px-3 py-1 text-sm transition-colors whitespace-nowrap ${cls}${ring}"><span class="font-bold">${name}</span>　${status}</button>`;
+                html += `<button onclick="selectSong('${key}')" title="切換到「${name}」" class="border rounded-lg px-3 py-0.5 text-sm leading-tight text-center transition-colors whitespace-nowrap ${cls}${ring}"><span class="block font-bold">${name}</span><span class="block text-xs">${status}</span></button>`;
             });
 
             html += `<span class="ml-auto text-sm text-gray-400 shrink-0">完成 <b class="text-white">${solvedCount}</b>/${options.length} 首${lastSolvedStamp ? `<span class="text-xs text-gray-500 ml-2">${lastSolvedStamp}</span>` : ''}</span>`;
