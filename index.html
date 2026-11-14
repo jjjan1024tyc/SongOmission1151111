@@ -107,6 +107,9 @@
         .seq-del { position: absolute; top: -7px; right: -7px; width: 17px; height: 17px; border-radius: 9999px; background: #dc2626; border: 1px solid #7f1d1d; color: #fff; font-size: 10px; font-weight: 900; line-height: 15px; text-align: center; display: none; z-index: 2; }
         .seq-del:hover { background: #ef4444; transform: scale(1.15); }
         #sequenceDisplay > span:hover .seq-del, #sequenceDisplay > span.is-selected .seq-del { display: block; }
+        .mod-row:hover .seq-del { display: block; }
+        /* 觸控裝置沒有「滑過」，模組的 ✕ 一直顯示 */
+        @media (hover: none) { .mod-row .seq-del { display: block; } }
         #sequenceDisplay > span.rounded-md { width: 2.1rem !important; height: 2.1rem !important; font-size: 1.1rem; }
         #sequenceDisplay > span.w-1 { height: 2.1rem !important; }
     </style>
@@ -190,7 +193,7 @@
             <div id="sourceTextDisplay" class="source-text-display w-full flex-1 bg-[#111827] border border-gray-700 rounded p-4 text-xl leading-[1.8] text-gray-200 overflow-y-auto hide-scrollbar shadow-inner"></div>
         </div>
         <div class="bg-[#111] border-r border-gray-800 px-4 py-3 min-h-0 flex flex-col gap-2">
-            <div id="moduleListVertical" class="flex-1 min-h-0 overflow-y-auto hide-scrollbar flex flex-col gap-2 relative z-10 py-1 pr-1"></div>
+            <div id="moduleListVertical" class="flex-1 min-h-0 overflow-y-auto hide-scrollbar flex flex-col gap-2 relative z-10 pt-2 pb-1 pr-2"></div>
         </div>
         <div class="bg-gray-950 px-4 py-3 min-h-0 flex flex-col">
             <div id="previewScroll" class="flex-1 min-h-0 bg-[#111827] border border-gray-700 rounded p-4 overflow-y-auto hide-scrollbar shadow-inner relative">
@@ -511,11 +514,11 @@
 
             modules.forEach(mod => {
                 const row = document.createElement('div');
-                row.className = 'w-full flex items-stretch bg-[#2a110d] border border-[#c07062] rounded-lg shadow-md shrink-0 overflow-hidden';
+                row.className = 'mod-row relative w-full flex items-stretch bg-[#2a110d] border border-[#c07062] rounded-lg shadow-md shrink-0';
 
                 // 主要區域：點擊加入序列
                 const btn = document.createElement('button');
-                btn.className = 'flex-1 min-w-0 flex items-center text-left hover:bg-[#c07062] p-2 transition-colors group';
+                btn.className = 'flex-1 min-w-0 flex items-center text-left hover:bg-[#c07062] p-2 rounded-lg transition-colors group';
                 btn.title = `呼叫模組 ${mod.id}`;
                 btn.onclick = () => addToSequence(mod.id);
 
@@ -534,9 +537,9 @@
                 btn.appendChild(idSpan);
                 btn.appendChild(textWrap);
 
-                // 刪除按鈕
+                // 刪除按鈕：滑鼠移到模組上時，右上角才出現 ✕ (同呼叫序列的方塊)
                 const del = document.createElement('button');
-                del.className = 'px-3 text-gray-400 hover:text-white hover:bg-red-700 border-l border-[#c07062]/50 transition-colors text-lg shrink-0';
+                del.className = 'seq-del';
                 del.textContent = '✕';
                 del.title = `刪除模組 ${mod.id}`;
                 del.onclick = () => removeModule(mod.id);
