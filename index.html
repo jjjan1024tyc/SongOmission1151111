@@ -87,10 +87,28 @@
             z-index: 1;
         }
         .uncov-sample {
-            color: #9ca3af;
+            color: #fff;
+            font-weight: 700;
             text-decoration: underline dashed #6b7280;
             text-underline-offset: 4px;
         }
+
+        /* ===== 版面：精簡欄位標題、序列方塊、下方資訊 ===== */
+        .tab-header { padding: 0.4rem 0; margin-bottom: 0; font-size: 1rem; }
+        .tab-arrow-r, .tab-arrow-l { position:absolute; top:0; width:0; height:0; border-top:1.2rem solid transparent; border-bottom:1.2rem solid transparent; border-left:1rem solid; z-index:20; }
+        .tab-arrow-r { right:-1rem; }
+        .tab-arrow-l { left:0; }
+        #resultStatusDisplay { padding: 0.3rem 0.75rem !important; font-size: 0.95rem !important; border-width: 1px !important; text-align: center; border-radius: 0.5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #resultStatusDisplay .text-4xl { font-size: 1.5rem !important; line-height: 1; }
+        #resultStatusDisplay .block { display: inline !important; }
+        #resultStatusDisplay span.text-base { display: none !important; }
+        #seqToolbar:empty { display: none; }
+        #seqToolbar .w-full { display: none; }
+        .seq-del { position: absolute; top: -7px; right: -7px; width: 17px; height: 17px; border-radius: 9999px; background: #dc2626; border: 1px solid #7f1d1d; color: #fff; font-size: 10px; font-weight: 900; line-height: 15px; text-align: center; display: none; z-index: 2; }
+        .seq-del:hover { background: #ef4444; transform: scale(1.15); }
+        #sequenceDisplay > span:hover .seq-del, #sequenceDisplay > span.is-selected .seq-del { display: block; }
+        #sequenceDisplay > span.rounded-md { width: 2.1rem !important; height: 2.1rem !important; font-size: 1.1rem; }
+        #sequenceDisplay > span.w-1 { height: 2.1rem !important; }
     </style>
 </head>
 <body class="h-screen flex flex-col overflow-hidden">
@@ -108,148 +126,108 @@
         </div>
     </div>
 
-    <header class="bg-[#111] p-3 border-b border-gray-800 flex items-center justify-between z-10 shrink-0 shadow-md gap-3">
-        <div class="flex items-center gap-4">
-            <h1 class="text-2xl font-black tracking-wider text-white">
-                歌詞省字王 <span class="text-gray-500 text-lg font-normal ml-2">模組化概念</span>
-            </h1>
+    <!-- 標題列：標題 + 五首成績 + 帳號 + 復原 (合併成一排) -->
+    <header class="bg-[#111] px-3 py-2 border-b border-gray-800 flex items-center gap-3 z-10 shrink-0 shadow-md">
+        <h1 class="text-xl font-black tracking-wider text-white shrink-0">歌詞省字王</h1>
+        <nav id="scoreboard" class="flex-1 min-w-0 flex flex-wrap items-center gap-2"></nav>
+        <div id="accountInfo" class="hidden text-xs text-gray-400 text-right leading-tight shrink-0">
+            <div id="accountEmail"></div>
+            <div id="syncStatus"></div>
         </div>
-        <div class="flex items-center gap-4">
-            <button id="undoBtn" onclick="undo()" title="復原上一步 (Ctrl+Z)" class="bg-gray-800 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-gray-800 text-white text-sm font-bold py-1.5 px-4 rounded border border-gray-600 transition-colors">↶ 復原</button>
-            <div class="text-xs text-gray-500 hidden sm:block">桃園市建國國中詹智傑老師製作(2026)</div>
-        </div>
+        <button id="undoBtn" onclick="undo()" title="復原上一步 (Ctrl+Z)" class="shrink-0 bg-gray-800 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-gray-800 text-white text-sm font-bold py-1.5 px-4 rounded border border-gray-600 transition-colors">↶ 復原</button>
     </header>
 
-    <!-- 五首歌的闖關成績 (點擊可切換歌曲) -->
-    <nav id="scoreboard" class="bg-[#0d0d0d] border-b border-gray-800 px-3 py-2 flex flex-wrap items-center gap-2 shrink-0"></nav>
+    <!-- 歌曲改由成績列切換，選單保留但隱藏 -->
+    <select id="songSelector" onchange="changeSong()" class="hidden">
+        <option value="star">1. 小星星</option>
+        <option value="congrats">2. 恭喜恭喜</option>
+        <option value="bird">3. 飛鳥和蟬</option>
+        <option value="content">4. 知足</option>
+        <option value="balloon">5. 告白氣球</option>
+    </select>
 
-    <main class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+    <!-- 三欄共用同一套格線：標題 / 上方工具 / 歌詞區 / 下方資訊 -->
+    <main class="flex-1 min-h-0 grid grid-cols-3" style="grid-template-rows: auto auto minmax(0, 1fr) auto;">
 
-        <section class="w-full md:w-1/3 flex flex-col border-r border-gray-800 h-full bg-[#0a0a0a]">
-            <div class="tab-header bg-[#ed7d31] shadow-lg shadow-orange-900/50 text-white z-10 relative">
-                1. 原始歌詞
-                <div class="absolute right-[-1rem] top-0 w-0 h-0 border-t-[1.35rem] border-t-transparent border-l-[1rem] border-l-[#ed7d31] border-b-[1.35rem] border-b-transparent z-20 hidden md:block"></div>
+        <!-- 第 1 排：欄位標題 -->
+        <div class="tab-header bg-[#ed7d31] shadow-lg shadow-orange-900/50 text-white z-10 relative">
+            1. 原始歌詞
+            <div class="tab-arrow-r" style="border-left-color:#ed7d31"></div>
+        </div>
+        <div class="tab-header bg-[#c07062] shadow-lg shadow-red-900/50 text-white z-10 relative">
+            <div class="tab-arrow-l" style="border-left-color:#0a0a0a"></div>
+            2. 定義模組
+            <div class="tab-arrow-r" style="border-left-color:#c07062"></div>
+        </div>
+        <div class="tab-header bg-[#a6a6a6] shadow-lg shadow-gray-900/50 text-black z-10 relative">
+            <div class="tab-arrow-l" style="border-left-color:#111"></div>
+            3. 呼叫模組、重組歌詞
+        </div>
+
+        <!-- 第 2 排：上方工具 -->
+        <div class="bg-[#0a0a0a] border-r border-gray-800 px-4 pt-3 flex flex-col justify-end">
+            <div class="text-sm text-gray-400"><span class="uncov-sample">虛線字</span>＝還沒有被任何模組包含的歌詞</div>
+        </div>
+        <div class="bg-[#111] border-r border-gray-800 px-4 pt-3 flex flex-col gap-2">
+            <div class="bg-[#1a1a1a] px-3 py-2 rounded border border-gray-800 text-sm text-gray-400 font-medium">
+                💡 在左側歌詞<b class="text-gray-200">拖曳反白</b>就會定義成模組
             </div>
-
-            <div class="px-4 pt-2 pb-0 flex flex-col gap-2 shrink-0">
-                <select id="songSelector" onchange="changeSong()" class="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white focus:outline-none focus:border-orange-500 transition-colors shadow-inner">
-                    <option value="star">1. 小星星</option>
-                    <option value="congrats">2. 恭喜恭喜</option>
-                    <option value="bird">3. 飛鳥和蟬</option>
-                    <option value="content">4. 知足</option>
-                    <option value="balloon">5. 告白氣球</option>
-                </select>
-                <div class="text-xs text-gray-500">
-                    <span class="uncov-sample">虛線字</span>＝還沒有被任何模組包含的歌詞
+        </div>
+        <div class="bg-gray-950 px-4 pt-3">
+            <div class="bg-[#1a1a1a] border border-gray-700 rounded-lg p-2 flex flex-col shadow-inner">
+                <div class="flex items-start gap-2">
+                <div id="sequenceDisplay" class="flex-1 min-w-0 flex flex-wrap items-center gap-1 text-xl font-bold text-yellow-400 content-start min-h-[2.3rem] max-h-28 overflow-y-auto hide-scrollbar px-1.5 pt-2 pb-1"></div>
+                <span id="sequenceLengthCount" class="shrink-0 mt-1.5 bg-gray-700 text-gray-200 text-sm font-bold px-2.5 py-0.5 rounded-full">0 字</span>
                 </div>
+                <div id="seqToolbar" class="hidden"></div>
             </div>
+        </div>
 
-            <div class="p-4 pt-3 flex-1 flex flex-col relative overflow-hidden min-h-0">
-                <!-- 每個字元都是一個 span，方便點選與標示 -->
-                <div id="sourceTextDisplay" class="source-text-display w-full flex-1 bg-[#111827] border border-gray-700 rounded p-4 text-lg leading-loose text-gray-200 overflow-y-auto hide-scrollbar shadow-inner"></div>
+        <!-- 第 3 排：歌詞區 (左右等高) -->
+        <div class="bg-[#0a0a0a] border-r border-gray-800 px-4 py-3 min-h-0 flex flex-col">
+            <div id="sourceTextDisplay" class="source-text-display w-full flex-1 bg-[#111827] border border-gray-700 rounded p-4 text-lg leading-[1.8] text-gray-200 overflow-y-auto hide-scrollbar shadow-inner"></div>
+        </div>
+        <div class="bg-[#111] border-r border-gray-800 px-4 py-3 min-h-0 flex flex-col gap-2">
+            <div class="text-xs text-center text-gray-500">點擊模組加入序列・按 ✕ 刪除模組</div>
+            <div id="moduleListVertical" class="flex-1 min-h-0 overflow-y-auto hide-scrollbar flex flex-col gap-2 relative z-10 py-1 pr-1"></div>
+        </div>
+        <div class="bg-gray-950 px-4 py-3 min-h-0 flex flex-col">
+            <div class="flex-1 min-h-0 bg-[#111827] border border-gray-700 rounded p-4 overflow-y-auto hide-scrollbar shadow-inner relative">
+                <div class="absolute top-2 right-2 text-xs text-gray-600 font-bold bg-black/50 px-2 py-1 rounded">重組歌詞結果</div>
+                <div id="previewArea" class="text-white text-lg leading-[1.8] whitespace-pre-wrap">組合結果將顯示於此...</div>
             </div>
+        </div>
 
-            <div class="p-3 border-t border-gray-800 flex justify-around bg-black shrink-0 text-sm">
-                <div class="text-center">
-                    <div class="text-gray-500 mb-1">原始歌詞字數</div>
-                    <div><span id="originalCharCount" class="text-2xl font-bold text-white">0</span> 字</div>
-                </div>
-                <div class="text-center">
-                    <div class="text-gray-500 mb-1">模組涵蓋率</div>
-                    <div><span id="coveragePercent" class="text-2xl font-bold text-orange-400">0</span> %</div>
-                    <div id="coverageNote" class="text-xs text-gray-500"></div>
-                </div>
-            </div>
-        </section>
-
-        <section class="w-full md:w-1/3 flex flex-col border-r border-gray-800 h-full bg-[#111]">
-            <div class="tab-header bg-[#c07062] shadow-lg shadow-red-900/50 text-white relative z-10">
-                <div class="absolute left-[-1rem] top-0 w-0 h-0 border-t-[1.35rem] border-t-transparent border-l-[1rem] border-l-[#0a0a0a] border-b-[1.35rem] border-b-transparent z-20 hidden md:block"></div>
-                2. 定義模組
-                <div class="absolute right-[-1rem] top-0 w-0 h-0 border-t-[1.35rem] border-t-transparent border-l-[1rem] border-l-[#c07062] border-b-[1.35rem] border-b-transparent z-20 hidden md:block"></div>
-            </div>
-
-            <div class="px-4 pt-2 pb-4 flex-1 flex flex-col relative overflow-hidden min-h-0 gap-3">
-                <!-- 操作提示 -->
-                <div class="bg-[#1a1a1a] p-3 rounded border border-gray-800 shrink-0 shadow-inner text-sm text-gray-400 font-medium leading-relaxed">
-                    💡 在左側歌詞<b class="text-gray-200">拖曳反白</b>，放開滑鼠就會定義成模組
-                </div>
-
-                <div class="text-xs text-center text-gray-500">點擊模組加入序列・按 ✕ 刪除模組</div>
-
-                <div id="moduleListVertical" class="flex-1 overflow-y-auto hide-scrollbar flex flex-col gap-2 relative z-10 py-1 pr-1"></div>
-            </div>
-
-            <div class="p-3 border-t border-gray-800 flex justify-center bg-[#0a0a0a] shrink-0 text-sm">
-                <div class="text-center">
-                    <div class="text-gray-500 mb-1">已定義模組字數</div>
-                    <div><span id="defTotalCount" class="text-2xl font-bold text-[#c07062]">0</span> 字</div>
-                    <div id="defBreakdown" class="text-xs text-gray-500">代號 0 + 內容 0</div>
-                </div>
-            </div>
-        </section>
-
-        <section class="w-full md:w-1/3 flex flex-col h-full bg-gradient-to-b from-gray-950 to-black relative">
-            <div class="tab-header bg-[#a6a6a6] shadow-lg shadow-gray-900/50 text-black relative z-10">
-                <div class="absolute left-[-1rem] top-0 w-0 h-0 border-t-[1.35rem] border-t-transparent border-l-[1rem] border-l-[#111] border-b-[1.35rem] border-b-transparent z-20 hidden md:block"></div>
-                3. 呼叫模組、重組歌詞
-            </div>
-
-            <div class="px-4 pt-2 pb-4 flex-1 flex flex-col relative overflow-hidden min-h-0 gap-3">
-
-                <!-- 序列顯示區 -->
-                <div class="bg-[#1a1a1a] border border-gray-700 rounded-lg p-2 flex flex-col shrink-0 min-h-[4rem] shadow-inner">
-                    <div class="flex justify-between items-center mb-1 border-b border-gray-800 pb-1 gap-2">
-                        <span class="text-gray-300 text-sm font-bold flex items-center gap-2">
-                            呼叫模組
-                            <span class="bg-gray-700 text-xs px-2 py-0.5 rounded-full" id="sequenceLengthCount">0 步</span>
-                        </span>
-                        <div class="flex gap-3">
-                            <button onclick="backspaceSeq()" title="刪除最後一步（有選取方塊時，刪除選取的那一步）" class="text-gray-400 hover:text-yellow-300 text-xs transition-colors">⌫ 退一步</button>
-                            <button onclick="clearSequence()" class="text-gray-400 hover:text-red-400 text-xs transition-colors">🗑️ 清除</button>
-                        </div>
+        <!-- 第 4 排：各欄下方資訊 (精簡成一～兩行) -->
+        <div class="bg-black border-t border-r border-gray-800 px-4 py-2 flex items-center justify-center gap-3 text-sm text-gray-400 whitespace-nowrap">
+            <span>原始歌詞 <b id="originalCharCount" class="text-white text-xl">0</b> 字</span>
+            <span class="text-gray-700">｜</span>
+            <span>模組涵蓋 <b id="coveragePercent" class="text-white text-xl">0</b>%</span>
+            <span id="coverageNote" class="text-xs text-gray-500"></span>
+        </div>
+        <div class="bg-[#0a0a0a] border-t border-r border-gray-800 px-4 py-2 flex items-center justify-center text-sm text-gray-400 whitespace-nowrap">
+            <span>已定義模組字數 <b id="defTotalCount" class="text-yellow-400 text-xl">0</b> 字<span class="text-xs text-gray-500">（<span id="defBreakdown"></span>）</span></span>
+        </div>
+        <div class="relative bg-black border-t border-gray-800 px-4 py-2 flex flex-col justify-center text-sm text-gray-400">
+            <!-- 只有一行：過程中顯示還原進度；有錯顯示「錯誤請修正」；完成後換成「成功還原」 -->
+            <div class="flex items-center gap-3 whitespace-nowrap h-9">
+                <div id="progressLine" class="flex-1 min-w-0 flex items-center gap-2">
+                    <span class="shrink-0">還原</span>
+                    <div class="flex-1 h-2.5 bg-gray-800 rounded-full overflow-hidden">
+                        <div id="restoreBar" class="h-full bg-sky-500 transition-all duration-300" style="width:0%"></div>
                     </div>
-                    <div id="sequenceDisplay" class="flex flex-wrap gap-1 text-xl font-bold text-yellow-400 content-start flex-1 min-h-[1.5rem] max-h-40 overflow-y-auto hide-scrollbar p-1"></div>
-                    <div id="seqToolbar" class="text-xs text-gray-500 mt-1 pt-1 border-t border-gray-800 flex flex-wrap items-center gap-2 min-h-[1.75rem]"></div>
+                    <span id="restorePercent" class="text-white font-bold w-11 text-right">0%</span>
                 </div>
-
-                <!-- 預覽結果區 -->
-                <div class="flex-1 bg-[#111827] border border-gray-700 rounded-lg p-3 overflow-y-auto hide-scrollbar shadow-inner relative group min-h-[6rem]">
-                    <div class="absolute top-2 right-2 text-xs text-gray-600 font-bold bg-black/50 px-2 py-1 rounded">重組歌詞結果</div>
-                    <div id="previewArea" class="text-white text-lg leading-loose whitespace-pre-wrap mt-6">組合結果將顯示於此...</div>
-                </div>
-
-                <div class="shrink-0 flex flex-col gap-2">
-                    <!-- 還原進度 -->
-                    <div class="flex items-center gap-3 text-sm">
-                        <span class="text-gray-400 shrink-0">還原進度</span>
-                        <div class="flex-1 h-2.5 bg-gray-800 rounded-full overflow-hidden">
-                            <div id="restoreBar" class="h-full bg-sky-500 transition-all duration-300" style="width:0%"></div>
-                        </div>
-                        <span id="restorePercent" class="text-white font-bold w-12 text-right">0%</span>
-                    </div>
-
-                    <div class="flex items-center justify-between bg-[#1a1a1a] rounded p-3 border border-gray-800">
-                        <div class="text-gray-400 text-sm">模組化總字數</div>
-                        <div class="flex items-baseline gap-2">
-                            <span id="formulaDisplay" class="text-sm font-bold text-gray-500">0 (定義) + 0 (呼叫) =</span>
-                            <div><span id="modularCharCount" class="text-3xl font-black text-white">0</span> <span class="text-gray-500 text-sm">字</span></div>
-                        </div>
-                    </div>
-
-                    <!-- 計分規則 (常駐) -->
-                    <div class="text-xs text-gray-400 bg-[#1a1a1a] border border-gray-800 rounded px-3 py-2 leading-relaxed">
-                        📏 <b class="text-gray-300">計分規則</b>：定義一個模組＝<b class="text-[#ffb4a6]">代號 1 字</b>＋內容字數；每呼叫一次＝<b class="text-yellow-400">1 字</b>（空白、換行不計）
-                    </div>
-
-                    <!-- 結果狀態大橫幅 -->
-                    <div id="resultStatusDisplay" class="rounded-lg py-3 px-4 text-center font-bold text-lg bg-gray-800 text-gray-400 border border-gray-700 shadow-lg transition-all duration-300">
-                        等待重組中...
-                    </div>
-                </div>
+                <div id="errorBox" class="hidden flex-1 min-w-0 rounded-lg px-3 py-1 text-center font-bold bg-red-900 text-white border border-red-700">❌ 錯誤請修正</div>
+                <div id="successBanner" class="hidden flex-1 min-w-0 rounded-lg px-3 py-0.5 text-lg text-center font-black bg-[#e8c338] text-black border border-yellow-500 shadow-[0_0_12px_rgba(232,195,56,0.5)] overflow-hidden text-ellipsis"></div>
+                <span class="shrink-0">模組化 <span id="formulaDisplay" class="text-gray-500"></span> <b id="modularCharCount" class="text-yellow-400 text-xl">0</b> 字</span>
             </div>
-        </section>
+            <div id="resultStatusDisplay" class="hidden"></div>
+            <div class="absolute bottom-0.5 right-1.5 text-[9px] text-gray-700 leading-none pointer-events-none">桃園市建國國中詹智傑老師製作(2026)</div>
+        </div>
+        </div>
     </main>
+
 
     <script>
         let modules = [];      // [{id:'A', text:'...'}]
@@ -259,6 +237,7 @@
         let dragIndex = null;  // 拖曳中的方塊位置
         let currentSong = null;    // 目前的歌曲代碼
         let solvedTime = null;     // 目前解法第一次成功的時間
+        let lastSolvedStamp = '';  // 最近一次完成的時間 (m/d h:m:s)，顯示在標題列
         const songStates = {};     // 每首歌各自的作答狀態 {modules, sequence, history, solvedTime}
         const bestScores = {};     // 每首歌的最佳省字紀錄
         // 每首歌最多可省的字數 (電腦搜尋的最佳切法，經老師確認)，達到即為「完美」
@@ -359,6 +338,7 @@
                 }
             });
             changeSong();
+            initAccount();
         };
 
         function changeSong() {
@@ -428,6 +408,21 @@
             const text = cleanText(getRaw().substring(r[0], r[1] + 1));
             sel.removeAllRanges();
             if (!text) return; // 只選到空白
+
+            // 不允許選到已經屬於某個模組的字 (有橘色標示的歌詞)
+            const raw = getRaw();
+            const { owner, occs } = computeCoverage(raw);
+            const overlapIds = [];
+            for (let i = r[0]; i <= r[1]; i++) {
+                if (owner[i] !== null && !/\s/.test(raw[i])) {
+                    const id = occs[owner[i]].id;
+                    if (!overlapIds.includes(id)) overlapIds.push(id);
+                }
+            }
+            if (overlapIds.length > 0) {
+                showMessage(`選到的字已經屬於模組 ${overlapIds.join('、')}，請只選還沒有標示的歌詞`);
+                return;
+            }
 
             // 檢查是否已存在相同的模組內容
             const dup = modules.find(m => m.text === text);
@@ -500,7 +495,7 @@
                 textWrap.className = 'border-l border-[#c07062]/50 group-hover:border-white/50 pl-3 ml-1 flex-1 min-w-0 flex flex-col gap-1 transition-colors';
 
                 const textSpan = document.createElement('span');
-                textSpan.className = 'text-white text-sm leading-tight whitespace-pre-wrap';
+                textSpan.className = 'text-white text-sm leading-[1.8] whitespace-pre-wrap';
                 textSpan.textContent = mod.text;
 
                 textWrap.appendChild(textSpan);
@@ -597,10 +592,26 @@
                 const selected = index === seqCursor;
                 const item = document.createElement('span');
                 item.className = selected
-                    ? 'cursor-pointer select-none bg-sky-800 border-2 border-sky-300 text-white rounded-md w-10 h-10 flex items-center justify-center shadow-[0_0_10px_rgba(56,189,248,0.7)] shrink-0 transition-all'
-                    : 'cursor-pointer select-none bg-yellow-900/50 border border-yellow-600 text-yellow-400 rounded-md w-10 h-10 flex items-center justify-center hover:border-sky-400 hover:text-sky-300 transition-all shadow-md shrink-0';
+                    ? 'is-selected relative cursor-pointer select-none bg-sky-800 border-2 border-sky-300 text-white rounded-md w-10 h-10 flex items-center justify-center shadow-[0_0_10px_rgba(56,189,248,0.7)] shrink-0 transition-all'
+                    : 'relative cursor-pointer select-none bg-yellow-900/50 border border-yellow-600 text-yellow-400 rounded-md w-10 h-10 flex items-center justify-center hover:border-sky-400 hover:text-sky-300 transition-all shadow-md shrink-0';
                 item.innerText = id;
-                item.title = `第 ${index + 1} 步：點一下選取，可移動或刪除`;
+                item.title = `第 ${index + 1} 步：點一下選取，新呼叫的模組會插在它後面`;
+                // 滑過方塊 (或選取時) 右上角出現 ✕，點一下刪除這一步
+                const del = document.createElement('button');
+                del.className = 'seq-del';
+                del.textContent = '✕';
+                del.title = `刪除第 ${index + 1} 步`;
+                del.onclick = (e) => {
+                    e.stopPropagation();
+                    snapshot();
+                    sequence.splice(index, 1);
+                    if (seqCursor !== null) {
+                        if (seqCursor === index) seqCursor = null;
+                        else if (seqCursor > index) seqCursor--;
+                    }
+                    refreshSequence();
+                };
+                item.appendChild(del);
                 item.draggable = true;
                 item.onclick = () => {
                     seqCursor = (seqCursor === index) ? null : index;
@@ -635,7 +646,7 @@
             });
 
             if (seqCursor === null) {
-                toolbar.innerHTML = '<span>💡 點方塊可選取，再移動或刪除；用滑鼠也可以直接拖曳排序</span>';
+                toolbar.innerHTML = '';
             } else {
                 const btnCls = 'bg-gray-700 hover:bg-gray-600 text-white px-2 py-0.5 rounded disabled:opacity-30';
                 toolbar.innerHTML = `
@@ -726,7 +737,7 @@
             document.getElementById('defTotalCount').innerText = defTotalCount;
             document.getElementById('defBreakdown').innerText = `代號 ${defSymbolCount} + 內容 ${defTextCount}`;
 
-            document.getElementById('sequenceLengthCount').innerText = `${sequence.length} 步`;
+            document.getElementById('sequenceLengthCount').innerHTML = `<span class="text-yellow-400">${sequence.length}</span> 字`;
 
             const previewArea = document.getElementById('previewArea');
             const resultStatusDisplay = document.getElementById('resultStatusDisplay');
@@ -736,11 +747,12 @@
             // 如果沒有序列，顯示初始狀態
             if (sequence.length === 0) {
                 previewArea.innerHTML = '<span class="text-gray-600">組合結果將顯示於此...</span>';
-                formulaDisplay.innerText = `${defTotalCount} (定義) + 0 (呼叫) =`;
+                formulaDisplay.innerHTML = `<span class="text-yellow-400">${defTotalCount}</span>＋<span class="text-yellow-400">0</span>＝`;
                 modularCharCount.innerText = defTotalCount;
                 setRestoreProgress(0);
-                resultStatusDisplay.className = "rounded-lg py-3 px-4 text-center font-bold text-lg bg-gray-800 text-gray-400 border border-gray-700 shadow-lg transition-all duration-300";
+                resultStatusDisplay.className = "hidden";
                 resultStatusDisplay.innerHTML = `等待重組中...`;
+                showSolved(false);
                 solvedTime = null;
                 renderScoreboard();
                 return;
@@ -817,7 +829,7 @@
             const sequenceCount = sequence.length;
             const modularTotalCount = defTotalCount + sequenceCount;
             modularCharCount.innerText = modularTotalCount;
-            formulaDisplay.innerText = `${defTotalCount} (定義) + ${sequenceCount} (呼叫) =`;
+            formulaDisplay.innerHTML = `<span class="text-yellow-400">${defTotalCount}</span>＋<span class="text-yellow-400">${sequenceCount}</span>＝`;
 
             let savedCount = originalCount - modularTotalCount;
 
@@ -827,25 +839,33 @@
                     const now = new Date();
                     const days = ['日', '一', '二', '三', '四', '五', '六'];
                     solvedTime = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日星期${days[now.getDay()]} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+                    lastSolvedStamp = `${now.getMonth() + 1}/${now.getDate()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
                 }
 
                 // 更新這首歌的最佳紀錄
                 const best = bestScores[currentSong];
-                if (best === undefined || savedCount > best) bestScores[currentSong] = savedCount;
-                const bestNote = bestScores[currentSong] > savedCount
-                    ? `<span class="text-base font-bold text-yellow-900 block">🏆 最佳紀錄：省 ${bestScores[currentSong]} 字</span>`
-                    : '';
-
-                resultStatusDisplay.className = "rounded-lg py-3 px-4 text-center font-black text-xl bg-[#e8c338] text-black border-2 border-yellow-500 shadow-[0_0_15px_rgba(232,195,56,0.5)] transition-all duration-300";
-                resultStatusDisplay.innerHTML = `成功還原歌詞，省下<span class="text-4xl text-red-600 mx-1 drop-shadow-md">${savedCount}</span>字！ <span class="text-base font-normal text-yellow-900 ml-2 block sm:inline">(${solvedTime})</span>${bestNote}`;
+                if (best === undefined || savedCount > best) {
+                    bestScores[currentSong] = savedCount;
+                    syncScores(); // 最佳成績有變，上傳到老師的試算表
+                }
+                // 完成：還原進度換成「成功還原」
+                document.getElementById('successBanner').innerHTML = `成功還原歌詞，省下<span class="text-3xl text-red-600 mx-1 leading-none">${savedCount}</span>字`;
+                showSolved('solved');
             } else {
                 solvedTime = null;
-                resultStatusDisplay.className = "rounded-lg py-3 px-4 text-center font-bold text-lg bg-red-900 text-white border border-red-700 shadow-lg transition-all duration-300";
-                resultStatusDisplay.innerHTML = matchLen < prevClean.length
-                    ? `❌ 紅色的部分和原歌詞不符，請修正！`
-                    : `⏳ 目前都正確，請繼續呼叫模組！`;
+                // 有錯：顯示「錯誤請修正」；目前都正確：顯示還原進度
+                showSolved(matchLen < prevClean.length ? 'error' : 'progress');
             }
             renderScoreboard();
+        }
+
+        // 切換右下角：progress (還原進度) / error (錯誤請修正) / solved (成功還原)
+        function showSolved(state) {
+            if (state === true) state = 'solved';
+            if (state === false) state = 'progress';
+            document.getElementById('progressLine').classList.toggle('hidden', state !== 'progress');
+            document.getElementById('errorBox').classList.toggle('hidden', state !== 'error');
+            document.getElementById('successBanner').classList.toggle('hidden', state !== 'solved');
         }
 
         // 產生重組預覽：正確部分白色、錯誤部分紅色，
@@ -884,6 +904,50 @@
             flush();
             if (inMark) html += '</span>';
             return html;
+        }
+
+        // ===================== 上傳成績到老師的試算表 =====================
+        // 只有透過 Google Apps Script 網頁應用程式開啟時才會上傳；
+        // 直接開啟 HTML 檔 (或放在 GitHub) 時不會上傳，其他功能照常。
+
+        const hasServer = typeof google !== 'undefined' && !!google.script && !!google.script.run;
+        let userEmail = '';
+
+        function setSyncStatus(text, color) {
+            const el = document.getElementById('syncStatus');
+            el.textContent = text;
+            el.className = color || 'text-gray-400';
+        }
+
+        function initAccount() {
+            if (!hasServer) return;
+            document.getElementById('accountInfo').classList.remove('hidden');
+            setSyncStatus('讀取帳號中…');
+            google.script.run
+                .withSuccessHandler(email => {
+                    userEmail = email;
+                    if (email) {
+                        document.getElementById('accountEmail').textContent = '👤 ' + email;
+                        setSyncStatus('完成一首歌後，成績會自動上傳');
+                    } else {
+                        document.getElementById('accountEmail').textContent = '⚠️ 未取得學校帳號';
+                        setSyncStatus('成績不會上傳，請改用學校帳號登入', 'text-amber-400');
+                    }
+                })
+                .withFailureHandler(() => setSyncStatus('⚠️ 無法連線，成績不會上傳', 'text-amber-400'))
+                .getUserEmail();
+        }
+
+        function syncScores() {
+            if (!hasServer || !userEmail) return;
+            setSyncStatus('☁️ 成績上傳中…', 'text-sky-300');
+            google.script.run
+                .withSuccessHandler(() => setSyncStatus('☁️ 成績已上傳', 'text-emerald-400'))
+                .withFailureHandler(err => {
+                    setSyncStatus('⚠️ 上傳失敗，下次完成時會再試', 'text-red-400');
+                    showMessage('成績上傳失敗：' + (err && err.message ? err.message : '請檢查網路'));
+                })
+                .saveScores(Object.assign({}, bestScores));
         }
 
         // ===================== 正上方：五首歌成績列 =====================
@@ -925,7 +989,7 @@
                 html += `<button onclick="selectSong('${key}')" title="切換到「${name}」" class="border rounded-full px-3 py-1 text-sm transition-colors whitespace-nowrap ${cls}${ring}"><span class="font-bold">${name}</span>　${status}</button>`;
             });
 
-            html += `<span class="ml-auto text-sm text-gray-400 shrink-0">完成 <b class="text-white">${solvedCount}</b>/${options.length} 首・總共省 <b class="text-yellow-300 text-lg">${total}</b> 字</span>`;
+            html += `<span class="ml-auto text-sm text-gray-400 shrink-0">完成 <b class="text-white">${solvedCount}</b>/${options.length} 首・總共省 <b class="text-yellow-300 text-lg">${total}</b> 字${lastSolvedStamp ? `<span class="text-xs text-gray-500 ml-2">${lastSolvedStamp}</span>` : ''}</span>`;
             bar.innerHTML = html;
         }
     </script>
